@@ -1,0 +1,16 @@
+[Unit]
+Description=FPS Multiplayer Dedicated Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/fps-server
+ExecStart=/home/ubuntu/fps-server/fps-server --headless --server
+Restart=on-failure
+RestartSec=3
+StandardOutput=append:/home/ubuntu/fps-server/logs/server.log
+StandardError=append:/home/ubuntu/fps-server/logs/server.err
+
+[Install]
+WantedBy=multi-user.target

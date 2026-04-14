@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://bgame00001"]
+
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="PackedScene" uid="uid://barena00001" path="res://scenes/arena.tscn" id="2_arena"]
+[ext_resource type="PackedScene" uid="uid://bhud000001" path="res://scenes/hud.tscn" id="3_hud"]
+
+[node name="Game" type="Node3D"]
+script = ExtResource("1_game")
+
+[node name="Arena" parent="." instance=ExtResource("2_arena")]
+
+[node name="Players" type="Node3D" parent="."]
+
+[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://scenes/player.tscn")
+spawn_path = NodePath("../Players")
+
+[node name="HUD" parent="." instance=ExtResource("3_hud")]

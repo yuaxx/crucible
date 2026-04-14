@@ -1,0 +1,45 @@
+# Godot 4+ specific ignores
+.godot/
+.import/
+
+# Locked empty subfolder from initial project creation
+fps-multiplayer/
+
+# Exports
+exports/
+*.exe
+*.x86_64
+*.dmg
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Private config
+*.secret
+
+# Internal planning docs — not for public repo
+docs/
+
+# Claude Code local settings
+.claude/
+
+# Original asset packs (rozpakowane, nieużywane bezpośrednio — kopiowane do assets/)
+kenney_blaster-kit_*/
+Stylized Nature MegaKit*/
+Universal Base Characters*/
+Audio/
+
+# Luzne FBX w root (animacje Mixamo przed skopiowaniem do assets/animations/)
+/*.fbx
+/*.fbx.import
