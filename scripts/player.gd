@@ -1,8 +1,5 @@
 extends CharacterBody3D
 
-const SPEED: float = 5.0
-const SPRINT_MULTIPLIER: float = 1.4
-const JUMP_VELOCITY: float = 5.0
 const MOUSE_SENSITIVITY: float = 0.002
 
 const PRIMARY_MODEL: PackedScene = preload("res://assets/models/weapons/blasters/blaster-c.glb")
@@ -62,7 +59,7 @@ var current_anim: String = ""
 var primary_gun: WeaponGun = WeaponGun.new(20, 0.12)
 var heavy_gun: WeaponGun = WeaponGun.new(50, 0.7)
 var melee: WeaponMelee = WeaponMelee.new()
-var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
+var movement: MovementController = null
 
 func _enter_tree() -> void:
 	set_multiplayer_authority(name.to_int())
@@ -70,6 +67,7 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	_setup_animations()
 	if is_multiplayer_authority():
+		movement = MovementController.new(self)
 		camera.current = true
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		character_model.visible = false
@@ -171,22 +169,14 @@ func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		_apply_anim_state()
 		return
-	if not is_on_floor():
-		velocity.y -= gravity * delta
-	if Input.is_action_just_pressed("jump") and is_on_floor() and hp > 0:
-		velocity.y = JUMP_VELOCITY
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
-	var current_speed := SPEED * (SPRINT_MULTIPLIER if Input.is_action_pressed("sprint") else 1.0)
-	if hp <= 0:
-		current_speed = 0
-	if direction:
-		velocity.x = direction.x * current_speed
-		velocity.z = direction.z * current_speed
-	else:
-		velocity.x = move_toward(velocity.x, 0, current_speed)
-		velocity.z = move_toward(velocity.z, 0, current_speed)
-	move_and_slide()
+	var wishdir := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+	movement.update(delta, {
+		"wishdir": wishdir,
+		"jump": Input.is_action_just_pressed("jump"),
+		"sprint": Input.is_action_pressed("sprint"),
+		"alive": hp > 0,
+	})
 	_compute_anim_state()
 	_apply_anim_state()
 
