@@ -59,6 +59,16 @@ var current_anim: String = ""
 const CAMERA_HEIGHT_NORMAL: float = 0.7
 const CAMERA_HEIGHT_SLIDE: float = 0.3
 
+const GRAPPLE_RANGE: float = 30.0
+const GRAPPLE_COOLDOWN: float = 8.0
+const GRAPPLE_ARRIVE_DIST: float = 1.8
+
+var grapple_active: bool = false
+var grapple_point: Vector3 = Vector3.ZERO
+var grapple_cooldown: float = 0.0
+var grapple_rope: MeshInstance3D = null
+var grapple_mesh: ImmediateMesh = null
+
 var primary_gun: WeaponGun = WeaponGun.new(20, 0.12)
 var heavy_gun: WeaponGun = WeaponGun.new(50, 0.7)
 var melee: WeaponMelee = WeaponMelee.new()
@@ -77,6 +87,7 @@ func _ready() -> void:
 		character_model.visible = false
 		viewmodel.visible = true
 		_equip_weapon(current_weapon)
+		_setup_grapple_visual()
 	else:
 		camera.current = false
 		character_model.visible = true
@@ -168,11 +179,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			_show_shot_effect.rpc(muzzle_world, shot.to)
 	if event.is_action_pressed("melee") and hp > 0:
 		melee.try_swing(melee_area, self)
+	if event.is_action_pressed("grapple"):
+		_try_start_grapple()
+	elif event.is_action_released("grapple"):
+		_end_grapple()
 
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		_apply_anim_state()
 		return
+	if grapple_cooldown > 0.0:
+		grapple_cooldown = max(grapple_cooldown - delta, 0.0)
+	if grapple_active and global_position.distance_to(grapple_point) < GRAPPLE_ARRIVE_DIST:
+		_end_grapple()
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var wishdir := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	movement.update(delta, {
@@ -181,7 +200,10 @@ func _physics_process(delta: float) -> void:
 		"sprint": Input.is_action_pressed("sprint"),
 		"crouch": Input.is_action_pressed("crouch"),
 		"alive": hp > 0,
+		"grapple_active": grapple_active,
+		"grapple_point": grapple_point,
 	})
+	_update_grapple_visual()
 	_compute_anim_state()
 	_apply_anim_state()
 
@@ -250,6 +272,49 @@ func _on_movement_state_changed(new_state: int) -> void:
 	var target_y: float = CAMERA_HEIGHT_SLIDE if new_state == MovementController.State.SLIDE else CAMERA_HEIGHT_NORMAL
 	var tween := create_tween()
 	tween.tween_property(camera_pivot, "position:y", target_y, 0.15)
+
+func _setup_grapple_visual() -> void:
+	grapple_mesh = ImmediateMesh.new()
+	grapple_rope = MeshInstance3D.new()
+	grapple_rope.mesh = grapple_mesh
+	grapple_rope.top_level = true
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.95, 0.8, 0.3)
+	mat.emission_enabled = true
+	mat.emission = Color(0.95, 0.8, 0.3)
+	mat.emission_energy_multiplier = 1.2
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	grapple_rope.material_override = mat
+	add_child(grapple_rope)
+
+func _try_start_grapple() -> void:
+	if grapple_cooldown > 0.0 or grapple_active or hp <= 0:
+		return
+	var from: Vector3 = camera.global_position
+	var to: Vector3 = from + (-camera.global_transform.basis.z) * GRAPPLE_RANGE
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.exclude = [get_rid()]
+	var result: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+	if result.is_empty():
+		return
+	grapple_point = result.position
+	grapple_active = true
+
+func _end_grapple() -> void:
+	if not grapple_active:
+		return
+	grapple_active = false
+	grapple_cooldown = GRAPPLE_COOLDOWN
+
+func _update_grapple_visual() -> void:
+	grapple_mesh.clear_surfaces()
+	if not grapple_active:
+		return
+	var hand_pos: Vector3 = camera.global_position + camera.global_transform.basis.x * 0.3 - camera.global_transform.basis.y * 0.25
+	grapple_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+	grapple_mesh.surface_add_vertex(hand_pos)
+	grapple_mesh.surface_add_vertex(grapple_point)
+	grapple_mesh.surface_end()
 
 func _respawn() -> void:
 	await get_tree().create_timer(3.0).timeout

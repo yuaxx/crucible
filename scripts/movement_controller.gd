@@ -20,6 +20,8 @@ const SLIDE_FRICTION: float = 4.0
 const SLIDE_MIN_SPEED: float = 3.5
 const SLIDE_ENTER_MIN_SPEED: float = 4.5
 
+const GRAPPLE_PULL_SPEED: float = 18.0
+
 signal state_changed(new_state: int)
 
 var body: CharacterBody3D
@@ -36,6 +38,13 @@ func _init(p_body: CharacterBody3D) -> void:
 
 func update(delta: float, input: Dictionary) -> void:
 	_track_floor(delta)
+	if input.get("grapple_active", false):
+		_apply_grapple(input)
+		body.move_and_slide()
+		if state != State.GRAPPLE:
+			state = State.GRAPPLE
+			state_changed.emit(State.GRAPPLE)
+		return
 	_apply_gravity(delta)
 	_update_slide(delta, input)
 	if state == State.SLIDE:
@@ -45,6 +54,13 @@ func update(delta: float, input: Dictionary) -> void:
 	_handle_jump(input)
 	body.move_and_slide()
 	_update_state()
+
+func _apply_grapple(input: Dictionary) -> void:
+	var target: Vector3 = input.get("grapple_point", body.global_position)
+	var to_target: Vector3 = target - body.global_position
+	if to_target.length() < 0.01:
+		return
+	body.velocity = to_target.normalized() * GRAPPLE_PULL_SPEED
 
 func _track_floor(delta: float) -> void:
 	var on_floor := body.is_on_floor()
