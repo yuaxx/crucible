@@ -8,6 +8,9 @@ extends CanvasLayer
 var local_player: Node = null
 
 func _ready() -> void:
+	if multiplayer.is_server():
+		set_process(false)
+		return
 	respawn_overlay.visible = false
 	GameState.score_changed.connect(_update_score)
 	_update_score()
