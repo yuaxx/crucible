@@ -56,6 +56,9 @@ signal weapon_changed(new_weapon: String)
 var anim_player: AnimationPlayer = null
 var current_anim: String = ""
 
+const CAMERA_HEIGHT_NORMAL: float = 0.7
+const CAMERA_HEIGHT_SLIDE: float = 0.3
+
 var primary_gun: WeaponGun = WeaponGun.new(20, 0.12)
 var heavy_gun: WeaponGun = WeaponGun.new(50, 0.7)
 var melee: WeaponMelee = WeaponMelee.new()
@@ -68,6 +71,7 @@ func _ready() -> void:
 	_setup_animations()
 	if is_multiplayer_authority():
 		movement = MovementController.new(self)
+		movement.state_changed.connect(_on_movement_state_changed)
 		camera.current = true
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		character_model.visible = false
@@ -175,6 +179,7 @@ func _physics_process(delta: float) -> void:
 		"wishdir": wishdir,
 		"jump": Input.is_action_just_pressed("jump"),
 		"sprint": Input.is_action_pressed("sprint"),
+		"crouch": Input.is_action_pressed("crouch"),
 		"alive": hp > 0,
 	})
 	_compute_anim_state()
@@ -240,6 +245,11 @@ func _on_died(attacker_id: int) -> void:
 	print("[SERVER] Player %s zabity przez %d" % [name, attacker_id])
 	GameState.register_kill(attacker_id, int(name))
 	_respawn.call_deferred()
+
+func _on_movement_state_changed(new_state: int) -> void:
+	var target_y: float = CAMERA_HEIGHT_SLIDE if new_state == MovementController.State.SLIDE else CAMERA_HEIGHT_NORMAL
+	var tween := create_tween()
+	tween.tween_property(camera_pivot, "position:y", target_y, 0.15)
 
 func _respawn() -> void:
 	await get_tree().create_timer(3.0).timeout

@@ -14,6 +14,12 @@ const MAX_HORIZONTAL_SPEED: float = 15.0
 const AIR_ACCEL: float = 20.0
 const AIR_WISH_SPEED: float = 3.5
 
+const SLIDE_DURATION: float = 1.0
+const SLIDE_BOOST: float = 1.3
+const SLIDE_FRICTION: float = 4.0
+const SLIDE_MIN_SPEED: float = 3.5
+const SLIDE_ENTER_MIN_SPEED: float = 4.5
+
 signal state_changed(new_state: int)
 
 var body: CharacterBody3D
@@ -23,6 +29,7 @@ var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9
 var time_since_land: float = 999.0
 var bhop_chain: int = 0
 var was_on_floor: bool = true
+var slide_time_left: float = 0.0
 
 func _init(p_body: CharacterBody3D) -> void:
 	body = p_body
@@ -30,7 +37,11 @@ func _init(p_body: CharacterBody3D) -> void:
 func update(delta: float, input: Dictionary) -> void:
 	_track_floor(delta)
 	_apply_gravity(delta)
-	_apply_wish_velocity(delta, input)
+	_update_slide(delta, input)
+	if state == State.SLIDE:
+		_apply_slide_friction(delta)
+	else:
+		_apply_wish_velocity(delta, input)
 	_handle_jump(input)
 	body.move_and_slide()
 	_update_state()
@@ -56,6 +67,8 @@ func _handle_jump(input: Dictionary) -> void:
 	if not body.is_on_floor() or not input.get("alive", true):
 		return
 	body.velocity.y = JUMP_VELOCITY
+	if state == State.SLIDE:
+		slide_time_left = 0.0
 	if time_since_land <= BHOP_WINDOW:
 		bhop_chain += 1
 		var h := Vector2(body.velocity.x, body.velocity.z)
@@ -66,6 +79,37 @@ func _handle_jump(input: Dictionary) -> void:
 			body.velocity.z = h.y
 	else:
 		bhop_chain = 0
+
+func _update_slide(delta: float, input: Dictionary) -> void:
+	var on_floor := body.is_on_floor()
+	var h_speed := Vector2(body.velocity.x, body.velocity.z).length()
+	if state == State.SLIDE:
+		slide_time_left -= delta
+		var crouch_held: bool = input.get("crouch", false)
+		if slide_time_left <= 0.0 or h_speed < SLIDE_MIN_SPEED or not on_floor or not crouch_held:
+			slide_time_left = 0.0
+	else:
+		if input.get("crouch", false) and input.get("sprint", false) and on_floor and h_speed >= SLIDE_ENTER_MIN_SPEED and input.get("alive", true):
+			_enter_slide()
+
+func _enter_slide() -> void:
+	state = State.SLIDE
+	slide_time_left = SLIDE_DURATION
+	var h := Vector2(body.velocity.x, body.velocity.z)
+	if h.length() > 0.01:
+		var new_speed: float = min(h.length() * SLIDE_BOOST, MAX_HORIZONTAL_SPEED)
+		h = h.normalized() * new_speed
+		body.velocity.x = h.x
+		body.velocity.z = h.y
+	state_changed.emit(State.SLIDE)
+
+func _apply_slide_friction(delta: float) -> void:
+	var h := Vector2(body.velocity.x, body.velocity.z)
+	var new_len: float = max(h.length() - SLIDE_FRICTION * delta, 0.0)
+	if h.length() > 0.01:
+		h = h.normalized() * new_len
+		body.velocity.x = h.x
+		body.velocity.z = h.y
 
 func _apply_wish_velocity(delta: float, input: Dictionary) -> void:
 	var wishdir: Vector3 = input.get("wishdir", Vector3.ZERO)
@@ -103,13 +147,16 @@ func _air_accelerate(delta: float, wishdir: Vector3, alive: bool) -> void:
 
 func _update_state() -> void:
 	var new_state: int
-	var horizontal: float = Vector2(body.velocity.x, body.velocity.z).length()
-	if not body.is_on_floor():
-		new_state = State.AIR
-	elif horizontal > 0.5:
-		new_state = State.RUN
+	if state == State.SLIDE and slide_time_left > 0.0:
+		new_state = State.SLIDE
 	else:
-		new_state = State.IDLE
+		var horizontal: float = Vector2(body.velocity.x, body.velocity.z).length()
+		if not body.is_on_floor():
+			new_state = State.AIR
+		elif horizontal > 0.5:
+			new_state = State.RUN
+		else:
+			new_state = State.IDLE
 	if new_state != state:
 		state = new_state
 		state_changed.emit(new_state)
