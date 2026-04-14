@@ -5,13 +5,22 @@ const PLAYER_SCENE: PackedScene = preload("res://scenes/player.tscn")
 @onready var players_container: Node3D = $Players
 @onready var hud: CanvasLayer = $HUD
 
+var _spawner: MultiplayerSpawner = null
+
 func _ready() -> void:
+	_setup_spawner()
 	players_container.child_entered_tree.connect(_on_player_spawned)
 	if multiplayer.is_server():
 		_spawn_player(1)
 		NetworkManager.peer_joined.connect(_on_peer_joined)
 		NetworkManager.peer_left.connect(_on_peer_left)
 	_try_bind_local_player()
+
+func _setup_spawner() -> void:
+	_spawner = MultiplayerSpawner.new()
+	add_child(_spawner)
+	_spawner.spawn_path = _spawner.get_path_to(players_container)
+	_spawner.add_spawnable_scene("res://scenes/player.tscn")
 
 func _on_player_spawned(_node: Node) -> void:
 	_try_bind_local_player()
