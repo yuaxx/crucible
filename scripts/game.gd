@@ -11,7 +11,6 @@ func _ready() -> void:
 	_setup_spawner()
 	players_container.child_entered_tree.connect(_on_player_spawned)
 	if multiplayer.is_server():
-		_spawn_player(1)
 		NetworkManager.peer_joined.connect(_on_peer_joined)
 		NetworkManager.peer_left.connect(_on_peer_left)
 	_try_bind_local_player()
